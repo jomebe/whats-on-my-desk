@@ -84,7 +84,10 @@ pub fn classify(raw: RawDevice) -> Option<VisualDevice> {
     if is_virtual {
         return None;
     }
-    let is_external = connection == "USB" || connection == "Bluetooth";
+    let is_external = connection == "USB"
+        || connection == "Bluetooth"
+        || ((category == "keyboard" || category == "mouse")
+            && !has(&text, &["acpi", "i8042", "ps/2", "touchpad", "precision touchpad"]));
     let mut hash = Sha256::new();
     hash.update(raw.stable_key.as_bytes());
     Some(VisualDevice {

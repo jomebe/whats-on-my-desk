@@ -48,6 +48,8 @@ pub fn enumerate() -> Vec<VisualDevice> {
                     y: rect.top,
                     primary: rect.left == 0 && rect.top == 0,
                 }),
+                visual_variant: Some("monitor".into()),
+                midi: None,
             }
         })
         .collect()

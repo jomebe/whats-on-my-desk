@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Settings } from "../devices/types";
 
-const defaults: Settings = { animations: true, showNames: false, showBuiltIn: false, showUnknown: false, showUsbGeneric: false, showPrinters: false, showVirtual: false, theme: "system", mockMode: false };
+const defaults: Settings = { animations: true, showNames: false, showBuiltIn: false, showUnknown: false, showUsbGeneric: false, showPrinters: false, showVirtual: false, theme: "dark", mockMode: false };
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(() => {

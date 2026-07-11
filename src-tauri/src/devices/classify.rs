@@ -105,5 +105,7 @@ pub fn classify(raw: RawDevice) -> Option<VisualDevice> {
         is_virtual,
         present: true,
         position_hint: None,
+        visual_variant: None,
+        midi: None,
     })
 }

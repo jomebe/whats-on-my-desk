@@ -1,8 +1,10 @@
 mod classify;
 mod deduplicate;
 mod enumerate;
+mod midi;
 mod models;
 mod monitors;
+pub mod watcher;
 pub use models::DeviceSnapshot;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -13,10 +15,16 @@ pub fn snapshot() -> DeviceSnapshot {
     let filtered_device_count = devices.len() as u32;
     devices = deduplicate::merge(devices);
     devices.extend(monitors::enumerate());
+    let midi_devices = midi::enumerate();
+    let midi_count = midi_devices.len();
+    devices.extend(midi_devices);
     devices.push(computer());
     limit_categories(&mut devices);
     devices.sort_by(|a, b| a.category.cmp(&b.category).then(a.id.cmp(&b.id)));
     let merged_physical_device_count = devices.len() as u32;
+    eprintln!(
+        "[devices] raw={raw_device_count} midi={midi_count} visual={merged_physical_device_count}"
+    );
     DeviceSnapshot {
         generated_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -42,6 +50,8 @@ fn computer() -> models::VisualDevice {
         is_virtual: false,
         present: true,
         position_hint: None,
+        visual_variant: Some("desktop".into()),
+        midi: None,
     }
 }
 
@@ -59,6 +69,9 @@ fn limit_categories(devices: &mut Vec<models::VisualDevice>) {
         ("phone", 1),
         ("storage", 3),
         ("gameController", 2),
+        ("midiKeyboard", 1),
+        ("midiController", 2),
+        ("midiInterface", 1),
         ("printer", 1),
         ("usbGeneric", 1),
         ("unknown", 1),

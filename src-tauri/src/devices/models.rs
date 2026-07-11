@@ -17,6 +17,10 @@ pub struct VisualDevice {
     pub present: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position_hint: Option<PositionHint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visual_variant: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub midi: Option<MidiInfo>,
 }
 
 #[derive(Clone, Serialize)]
@@ -35,6 +39,14 @@ pub struct PositionHint {
     pub x: i32,
     pub y: i32,
     pub primary: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiInfo {
+    pub has_input: bool,
+    pub has_output: bool,
+    pub port_count: u32,
 }
 
 pub struct RawDevice {

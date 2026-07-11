@@ -8,7 +8,10 @@ export function DeviceScene({ devices, showNames }: { devices: VisualDevice[]; s
   const byCategory = (category: DeviceCategory) => devices.filter(device => device.category === category);
   const item = (device: VisualDevice, slot: string, index = 0) => <button key={device.id} className={`scene-device slot-${slot} slot-${slot}-${index}`} onClick={event => { event.stopPropagation(); setSelected(device); }} aria-label={device.displayName ?? device.category}><DeviceIllustration category={device.category} />{device.count > 1 && <span className="count">{device.count}</span>}{showNames && <span className="device-name">{device.displayName}</span>}</button>;
   return <main className="scene" onClick={() => setSelected(null)}>
-    <div className="desk-surface" />
+    <div className="wall-layer"><div className="poster">MAKE<br/>SOMETHING</div><div className="ambient-light" /></div>
+    <div className="desk-surface"><div className="desk-grain" /><div className="desk-front" /></div>
+    <div className="cable cable-monitor" /><div className="cable cable-keyboard" /><div className="cable cable-midi" />
+    <div className="decoration plant"><i/><i/><i/></div><div className="decoration mug" />
     <section className={`displays displays-${displays.length}`}>{displays.map((device, index) => item(device, "display", index))}</section>
     {byCategory("computer").slice(0, 1).map(device => item(device, "computer"))}
     {byCategory("camera").slice(0, 1).map(device => item(device, "camera"))}
@@ -20,6 +23,9 @@ export function DeviceScene({ devices, showNames }: { devices: VisualDevice[]; s
     {byCategory("storage").slice(0, 3).map((device, index) => item(device, "storage", index))}
     {byCategory("phone").slice(0, 1).map(device => item(device, "phone"))}
     {byCategory("gameController").slice(0, 2).map((device, index) => item(device, "controller", index))}
+    {byCategory("midiKeyboard").slice(0, 1).map(device => item(device, "midi-keyboard"))}
+    {byCategory("midiController").slice(0, 2).map((device, index) => item(device, "midi-controller", index))}
+    {byCategory("midiInterface").slice(0, 1).map(device => item(device, "midi-interface"))}
     {byCategory("printer").slice(0, 1).map(device => item(device, "printer"))}
     {byCategory("usbGeneric").slice(0, 1).map(device => item(device, "usb"))}
     {byCategory("unknown").slice(0, 1).map(device => item(device, "unknown"))}

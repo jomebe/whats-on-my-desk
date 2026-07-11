@@ -1,6 +1,6 @@
 # What’s on My Desk?
 
-A local-first Windows desktop app that turns the devices currently connected to your PC into a quiet, illustrated desk scene. It uses Tauri 2, Rust, React, TypeScript, Vite, and native Win32 device APIs.
+A local-first Windows browser app. `WhatsOnMyDeskAgent.exe` runs a loopback-only Rust agent, opens the default browser, and turns the devices currently connected to your PC into a quiet, illustrated desk scene.
 
 ## Features
 
@@ -9,7 +9,7 @@ A local-first Windows desktop app that turns the devices currently connected to 
 - Classifies keyboards, mice, USB storage, cameras, controllers, printers, audio, Bluetooth, and generic USB devices.
 - Refreshes the scene every second, so device changes appear within about two seconds.
 - Keeps raw PnP instance IDs in the Rust process; the UI receives a short SHA-256-derived local ID.
-- Includes local settings, light/dark/system themes, reduced-motion support, and a UI-only Mock Mode.
+- Stores agent preferences locally, with light/dark/system themes, reduced-motion support, and Mock Mode.
 - Makes no network requests and includes no analytics or cloud account.
 
 ## Requirements
@@ -18,13 +18,12 @@ A local-first Windows desktop app that turns the devices currently connected to 
 - Node.js 20 or newer and npm
 - Rust stable with the MSVC target
 - Visual Studio Build Tools with Desktop development with C++
-- WebView2 Runtime
 
 ## Development
 
 ```powershell
 npm install
-npm run tauri dev
+npm run agent:dev
 ```
 
 Frontend-only preview (device scan is unavailable, but Mock Mode works):
@@ -37,16 +36,16 @@ Open the small control in the upper-right corner and enable **Mock mode** to add
 
 ## Cloudflare Pages demo
 
-The static [Pages demo](https://whats-on-my-desk.pages.dev/) is intentionally a Mock Mode preview. Browsers cannot inspect all Windows-connected devices without explicit per-device permission, so actual detection is available only in the Tauri app. The Pages deployment contains no Functions or Workers.
+The static [Pages demo](https://whats-on-my-desk.pages.dev/) opens the small offline screen first; choose **Open Demo Mode** to explore the scene. Browsers cannot inspect all Windows-connected devices without explicit per-device permission, so actual detection is available only through the local agent. The Pages deployment contains no Functions or Workers.
 
 ## Build
 
 ```powershell
 npm run build
-npm run build:desktop
+npm run build:agent
 ```
 
-`build:desktop` avoids a Windows redirected-Documents path issue and writes `WhatsOnMyDesk.exe` plus installer packages to `release/`.
+The command writes `WhatsOnMyDeskAgent.exe` to `release/`. The agent hosts the built React site and its API on `http://127.0.0.1:47831`.
 
 ## Detection notes and limitations
 

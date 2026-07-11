@@ -12,15 +12,35 @@ pub struct VisualDevice {
     pub connection_type: String,
     pub icon_key: String,
     pub count: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_external: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_virtual: Option<bool>,
+    pub is_external: bool,
+    pub is_virtual: bool,
     pub present: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position_hint: Option<PositionHint>,
 }
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DeviceSnapshot { pub generated_at: u64, pub devices: Vec<VisualDevice> }
+pub struct DeviceSnapshot {
+    pub generated_at: u64,
+    pub raw_device_count: u32,
+    pub filtered_device_count: u32,
+    pub merged_physical_device_count: u32,
+    pub devices: Vec<VisualDevice>,
+}
 
-pub struct RawDevice { pub stable_key: String, pub name: String, pub manufacturer: String, pub class_name: String, pub instance_id: String }
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionHint {
+    pub x: i32,
+    pub y: i32,
+    pub primary: bool,
+}
+
+pub struct RawDevice {
+    pub stable_key: String,
+    pub name: String,
+    pub manufacturer: String,
+    pub class_name: String,
+    pub instance_id: String,
+}

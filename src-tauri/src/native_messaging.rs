@@ -52,6 +52,7 @@ pub fn run() {
                 json!({"type":"agent-error","payload":{"code":"INVALID_MESSAGE","message":"Unsupported message"}}),
             ),
         }
+    }
 }
 fn read(input: &mut impl Read) -> Option<Value> {
     let mut length = [0; 4];

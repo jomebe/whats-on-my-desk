@@ -2,14 +2,25 @@ use std::ptr::{null, null_mut};
 use windows_sys::Win32::{
     Foundation::{GetLastError, SetLastError, HWND, LPARAM, RECT},
     UI::WindowsAndMessaging::{
-        EnumWindows, FindWindowExW, FindWindowW, GetClientRect, SendMessageTimeoutW, SetParent,
-        SetWindowPos, SMTO_NORMAL, SWP_FRAMECHANGED, SWP_NOZORDER, SWP_SHOWWINDOW,
+        EnumWindows, FindWindowExW, FindWindowW, GetClientRect, GetParent, GetWindowLongPtrW,
+        SendMessageTimeoutW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE,
+        SMTO_NORMAL, SWP_FRAMECHANGED, SWP_NOZORDER, SWP_SHOWWINDOW, WS_CHILD, WS_EX_APPWINDOW,
+        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
     },
 };
 
+#[derive(Clone, Copy)]
 pub enum Strategy {
     SiblingWorkerW,
     ProgmanDirect,
+}
+impl Strategy {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::SiblingWorkerW => "SiblingWorkerW",
+            Self::ProgmanDirect => "ProgmanDirect",
+        }
+    }
 }
 pub struct Result {
     pub wallpaper_parent: HWND,
@@ -25,8 +36,13 @@ pub fn find_wallpaper_parent() -> std::result::Result<Result, String> {
             return Err("ProgmanNotFound".into());
         }
         let mut output = 0usize;
-        let _ = SendMessageTimeoutW(progman, 0x052C, 0xD, 1, SMTO_NORMAL, 1000, &mut output);
+        let _ = SendMessageTimeoutW(progman, 0x052C, 0xD, 0, SMTO_NORMAL, 1000, &mut output);
         let _ = SendMessageTimeoutW(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, &mut output);
+        let mut worker = FindWindowExW(null_mut(), null_mut(), wide("WorkerW").as_ptr(), null());
+        while !worker.is_null() {
+            debug(|| eprintln!("[workerw] top_level_workerw={worker:p}"));
+            worker = FindWindowExW(null_mut(), worker, wide("WorkerW").as_ptr(), null());
+        }
         let mut context = Box::new(Context {
             defview_parent: null_mut(),
             wallpaper_worker: null_mut(),
@@ -42,10 +58,10 @@ pub fn find_wallpaper_parent() -> std::result::Result<Result, String> {
         } else {
             Strategy::SiblingWorkerW
         };
-        eprintln!(
-            "[workerw] progman={progman:p} defview_parent={:p} wallpaper_workerw={parent:p}",
-            context.defview_parent
-        );
+        debug(|| eprintln!("[workerw] progman={progman:p}"));
+        debug(|| eprintln!("[workerw] defview_parent={:p}", context.defview_parent));
+        debug(|| eprintln!("[workerw] wallpaper_parent={parent:p}"));
+        debug(|| eprintln!("[workerw] strategy={}", strategy.label()));
         Ok(Result {
             wallpaper_parent: parent,
             strategy,
@@ -72,10 +88,32 @@ unsafe extern "system" fn enum_proc(hwnd: HWND, data: LPARAM) -> i32 {
 }
 pub fn attach(host: HWND, parent: HWND) -> std::result::Result<(), String> {
     unsafe {
+        debug(|| eprintln!("[workerw] host_before_parent={:p}", GetParent(host)));
         SetLastError(0);
         let previous = SetParent(host, parent);
-        if previous.is_null() && GetLastError() != 0 {
-            return Err(format!("SetParent error={}", GetLastError()));
+        let last_error = GetLastError();
+        debug(|| eprintln!("[workerw] set_parent_previous={previous:p}"));
+        debug(|| eprintln!("[workerw] set_parent_last_error={last_error}"));
+        if previous.is_null() && last_error != 0 {
+            return Err(format!("SetParent error={last_error}"));
+        }
+        let style = GetWindowLongPtrW(host, GWL_STYLE) as u32;
+        SetWindowLongPtrW(
+            host,
+            GWL_STYLE,
+            ((style & !WS_POPUP) | WS_CHILD | WS_VISIBLE) as isize,
+        );
+        let ex_style = GetWindowLongPtrW(host, GWL_EXSTYLE) as u32;
+        SetWindowLongPtrW(
+            host,
+            GWL_EXSTYLE,
+            ((ex_style & !WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) as isize,
+        );
+        if GetParent(host) != parent {
+            return Err(format!(
+                "SetParent verification failed parent={:p}",
+                GetParent(host)
+            ));
         }
         let mut rect = RECT::default();
         if GetClientRect(parent, &mut rect) == 0 {
@@ -93,10 +131,20 @@ pub fn attach(host: HWND, parent: HWND) -> std::result::Result<(), String> {
         {
             return Err(format!("SetWindowPos error={}", GetLastError()));
         }
-        eprintln!(
-            "[workerw] set_parent success=true parent_client={}x{}",
-            rect.right, rect.bottom
-        );
+        debug(|| {
+            eprintln!(
+                "[workerw] parent_client={}x{}",
+                rect.right - rect.left,
+                rect.bottom - rect.top
+            )
+        });
+        debug(|| eprintln!("[workerw] host_after_parent={:p}", GetParent(host)));
         Ok(())
+    }
+}
+
+fn debug(log: impl FnOnce()) {
+    if std::env::var_os("WOMD_DEBUG_WORKERW").as_deref() == Some(std::ffi::OsStr::new("1")) {
+        log();
     }
 }

@@ -131,7 +131,9 @@ pub async fn serve(open_browser: bool) {
         .await
         .expect("bind local agent");
     let _keep_native_registration = native.ok();
-    if open_browser { let _ = webbrowser::open(ORIGIN); }
+    if open_browser {
+        let _ = webbrowser::open(ORIGIN);
+    }
     axum::serve(listener, app).await.expect("serve local agent");
 }
 

@@ -2,12 +2,12 @@ import { useState } from "react";
 import type { DeviceCategory, VisualDevice } from "../devices/types";
 import { DeviceIllustration } from "./DeviceIllustration";
 
-export function DeviceScene({ devices, showNames }: { devices: VisualDevice[]; showNames: boolean }) {
+export function DeviceScene({ devices, showNames, interactionMode }: { devices: VisualDevice[]; showNames: boolean; interactionMode: "wallpaper" | "interactive" }) {
   const [selected, setSelected] = useState<VisualDevice | null>(null);
   const displays = devices.filter(device => device.category === "display").slice(0, 4);
   const byCategory = (category: DeviceCategory) => devices.filter(device => device.category === category);
   const item = (device: VisualDevice, slot: string, index = 0) => <button key={device.id} className={`scene-device slot-${slot} slot-${slot}-${index}`} onClick={event => { event.stopPropagation(); setSelected(device); }} aria-label={device.displayName ?? device.category}><DeviceIllustration category={device.category} />{device.count > 1 && <span className="count">{device.count}</span>}{showNames && <span className="device-name">{device.displayName}</span>}</button>;
-  return <main className="scene" onClick={() => setSelected(null)}>
+  return <main className={`scene mode-${interactionMode}`} onClick={() => setSelected(null)}>
     <div className="wall-layer"><div className="poster">MAKE<br/>SOMETHING</div><div className="ambient-light" /></div>
     <div className="desk-surface"><div className="desk-grain" /><div className="desk-front" /></div>
     <div className="cable cable-monitor" /><div className="cable cable-keyboard" /><div className="cable cable-midi" />

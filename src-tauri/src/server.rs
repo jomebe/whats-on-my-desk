@@ -91,7 +91,7 @@ impl Default for Settings {
     }
 }
 
-pub async fn serve() {
+pub async fn serve(open_browser: bool) {
     eprintln!("[agent] starting snapshot");
     let first = devices::snapshot();
     eprintln!("[agent] snapshot ready");
@@ -131,7 +131,7 @@ pub async fn serve() {
         .await
         .expect("bind local agent");
     let _keep_native_registration = native.ok();
-    let _ = webbrowser::open(ORIGIN);
+    if open_browser { let _ = webbrowser::open(ORIGIN); }
     axum::serve(listener, app).await.expect("serve local agent");
 }
 

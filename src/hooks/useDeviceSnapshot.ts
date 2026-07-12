@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DeviceSnapshot } from "../devices/types";
 
-const empty: DeviceSnapshot = { generatedAt: 0, rawDeviceCount: 0, filteredDeviceCount: 0, mergedPhysicalDeviceCount: 0, devices: [] };
+const empty: DeviceSnapshot = { revision: 0, source: "agent", generatedAt: 0, rawDeviceCount: 0, filteredDeviceCount: 0, mergedPhysicalDeviceCount: 0, devices: [] };
 type AgentStatus = "connecting" | "online" | "offline";
 
 export function useDeviceSnapshot() {

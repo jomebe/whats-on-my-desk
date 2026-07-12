@@ -26,6 +26,8 @@ pub struct VisualDevice {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceSnapshot {
+    pub revision: u64,
+    pub source: String,
     pub generated_at: u64,
     pub raw_device_count: u32,
     pub filtered_device_count: u32,

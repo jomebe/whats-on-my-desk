@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "What's on My Desk Bridge",
+  "version": "0.2.0",
+  "description": "Connects What's on My Desk Pages app to local Windows Agent.",
+  "permissions": ["nativeMessaging", "storage"],
+  "host_permissions": ["https://whats-on-my-desk.pages.dev/*", "http://127.0.0.1:5173/*"],
+  "background": { "service_worker": "service-worker.js", "type": "module" },
+  "content_scripts": [{ "matches": ["https://whats-on-my-desk.pages.dev/*", "http://127.0.0.1:5173/*"], "js": ["content-script.js"], "run_at": "document_start" }]
+}

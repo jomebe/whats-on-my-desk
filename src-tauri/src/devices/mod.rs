@@ -26,6 +26,8 @@ pub fn snapshot() -> DeviceSnapshot {
         "[devices] raw={raw_device_count} midi={midi_count} visual={merged_physical_device_count}"
     );
     DeviceSnapshot {
+        revision: 0,
+        source: "agent".into(),
         generated_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

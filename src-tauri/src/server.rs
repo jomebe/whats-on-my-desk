@@ -165,12 +165,13 @@ fn spawn_watchers(state: AppState, mut native_rx: mpsc::UnboundedReceiver<()>) {
 }
 
 async fn rebuild_and_broadcast(state: &AppState, _: &str) -> DeviceSnapshot {
-    let next = devices::snapshot();
+    let mut next = devices::snapshot();
     let next_hash = fingerprint(&next);
     let mut previous = state.snapshot.lock().await;
     let previous_hash = fingerprint(&previous);
     let changed = previous_hash != next_hash;
     if changed {
+        next.revision = previous.revision + 1;
         *previous = next.clone();
         let _ = state.events.send(AgentEvent {
             kind: "device-snapshot-updated",

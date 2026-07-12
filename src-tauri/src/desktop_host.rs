@@ -22,6 +22,10 @@ pub fn run() {
         ToggleInteraction,
         Wallpaper,
         HealthCheck,
+        TrayEnter,
+        TrayWallpaper,
+        TrayRefresh,
+        TrayExit,
     }
     static INTERACTIVE: AtomicBool = AtomicBool::new(false);
     static EVENT_PROXY: OnceLock<EventLoopProxy<HostEvent>> = OnceLock::new();
@@ -75,6 +79,57 @@ pub fn run() {
     }
     let event_loop = EventLoopBuilder::<HostEvent>::with_user_event().build();
     let _ = EVENT_PROXY.set(event_loop.create_proxy());
+    let tray = {
+        use tray_icon::{
+            menu::{Menu, MenuEvent, MenuItem},
+            Icon, TrayIconBuilder, TrayIconEvent,
+        };
+        let menu = Menu::new();
+        let enter = MenuItem::new("Enter Interaction Mode", true, None);
+        let wallpaper = MenuItem::new("Return to Wallpaper Mode", true, None);
+        let refresh = MenuItem::new("Refresh Devices", true, None);
+        let exit = MenuItem::new("Exit", true, None);
+        let _ = menu.append(&enter);
+        let _ = menu.append(&wallpaper);
+        let _ = menu.append(&refresh);
+        let _ = menu.append(&exit);
+        let proxy = EVENT_PROXY.get().expect("event proxy").clone();
+        let enter_id = enter.id().clone();
+        let wallpaper_id = wallpaper.id().clone();
+        let refresh_id = refresh.id().clone();
+        let exit_id = exit.id().clone();
+        MenuEvent::set_event_handler(Some(move |event: tray_icon::menu::MenuEvent| {
+            let target = if event.id() == &enter_id {
+                HostEvent::TrayEnter
+            } else if event.id() == &wallpaper_id {
+                HostEvent::TrayWallpaper
+            } else if event.id() == &refresh_id {
+                HostEvent::TrayRefresh
+            } else if event.id() == &exit_id {
+                HostEvent::TrayExit
+            } else {
+                return;
+            };
+            let _ = proxy.send_event(target);
+        }));
+        let proxy = EVENT_PROXY.get().expect("event proxy").clone();
+        TrayIconEvent::set_event_handler(Some(move |event| {
+            if matches!(
+                event,
+                TrayIconEvent::Click { .. } | TrayIconEvent::DoubleClick { .. }
+            ) {
+                let _ = proxy.send_event(HostEvent::TrayEnter);
+            }
+        }));
+        let icon =
+            Icon::from_rgba([0xd1, 0x9a, 0x68, 0xff].repeat(16 * 16), 16, 16).expect("tray icon");
+        TrayIconBuilder::new()
+            .with_menu(Box::new(menu))
+            .with_tooltip("What’s on My Desk?")
+            .with_icon(icon)
+            .build()
+            .expect("tray icon")
+    };
     let health_proxy = EVENT_PROXY.get().expect("event proxy").clone();
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(4));
@@ -185,6 +240,10 @@ pub fn run() {
                 } else { let _ = webview.focus_parent(); }
                 let _ = webview.evaluate_script(&format!("window.dispatchEvent(new CustomEvent('womd-interaction-mode', {{ detail: {{ mode: '{}' }} }}));", next.label()));
             }
+            Event::UserEvent(HostEvent::TrayEnter) => { if !INTERACTIVE.load(Ordering::Relaxed) { let _ = EVENT_PROXY.get().expect("event proxy").send_event(HostEvent::ToggleInteraction); } }
+            Event::UserEvent(HostEvent::TrayWallpaper) => { if INTERACTIVE.load(Ordering::Relaxed) { let _ = EVENT_PROXY.get().expect("event proxy").send_event(HostEvent::ToggleInteraction); } }
+            Event::UserEvent(HostEvent::TrayRefresh) => { let _ = webview.evaluate_script("window.location.reload()"); }
+            Event::UserEvent(HostEvent::TrayExit) => { let _ = &tray; *flow = ControlFlow::Exit; }
             Event::UserEvent(HostEvent::Wallpaper) if INTERACTIVE.load(Ordering::Relaxed) => {
                 INTERACTIVE.store(false, Ordering::Relaxed);
                 crate::windows::interaction::set_mode(host, crate::windows::interaction::InteractionMode::Wallpaper);

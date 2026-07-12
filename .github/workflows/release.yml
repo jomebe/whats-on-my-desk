@@ -1,0 +1,23 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions: { contents: write }
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: choco install innosetup -y --no-progress
+      - run: npm ci
+      - shell: powershell
+        run: .\scripts\package-release.ps1
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/WhatsOnMyDeskSetup-x64.exe
+            release/WhatsOnMyDesk-portable-x64.zip
+            release/SHA256SUMS.txt

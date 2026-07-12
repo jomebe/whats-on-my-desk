@@ -9,7 +9,7 @@ try {
   finally { Pop-Location }
   $release = Join-Path $workspace "release"
   New-Item -ItemType Directory -Path $release -Force | Out-Null
-  Copy-Item "src-tauri\target\release\WhatsOnMyDeskAgent.exe" $release -Force
+  Copy-Item "src-tauri\target\release\WhatsOnMyDesk.exe" $release -Force
 }
 finally {
   Pop-Location

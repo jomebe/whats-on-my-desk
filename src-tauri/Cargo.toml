@@ -1,6 +1,6 @@
 [package]
 name = "whats_on_my_desk_agent"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -12,7 +12,7 @@ name = "whats_on_my_desk_agent"
 crate-type = ["rlib"]
 
 [[bin]]
-name = "WhatsOnMyDeskAgent"
+name = "WhatsOnMyDesk"
 path = "src/main.rs"
 
 [dependencies]
@@ -28,5 +28,5 @@ tao = "0.35"
 wry = "0.55"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi"] }
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Devices_DeviceAndDriverInstallation", "Win32_Devices_Properties", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Power", "Win32_Media_Audio", "Win32_UI_Input", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Win32_Devices_DeviceAndDriverInstallation", "Win32_Devices_Properties", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_Power", "Win32_System_Threading", "Win32_Media_Audio", "Win32_UI_Input", "Win32_UI_WindowsAndMessaging"] }
 

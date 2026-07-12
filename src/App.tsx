@@ -14,7 +14,18 @@ type AppMode = "initializing" | "full" | "web" | "setupRequired" | "demo" | "err
 const empty: DeviceSnapshot = { revision: 0, source: "agent", generatedAt: 0, devices: [] };
 export default function App() {
   const { settings, update } = useSettings(); const [mode, setMode] = useState<AppMode>("initializing"); const [snapshot, setSnapshot] = useState(empty); const [mocks, setMocks] = useState(initialMocks); const [settingsOpen, setSettingsOpen] = useState(false); const revision = useRef(0);
-  useEffect(() => connectExtension(message => { if (message.type === "status") setMode(message.connected ? "full" : "setupRequired"); if (message.type === "snapshot" && message.snapshot.revision > revision.current) { revision.current = message.snapshot.revision; setSnapshot({ ...message.snapshot, devices: [...message.snapshot.devices] }); setMode("full"); } if (message.type === "error") setMode("error"); }), []);
+  const localApp = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+  useEffect(() => {
+    if (localApp) {
+      let socket: WebSocket | undefined;
+      const apply = (next: DeviceSnapshot) => { if (next.revision >= revision.current) { revision.current = next.revision; setSnapshot({ ...next, devices: [...next.devices] }); setMode("full"); } };
+      void fetch("/api/device-snapshot").then(response => response.json()).then(apply).catch(() => setMode("error"));
+      socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+      socket.onmessage = event => { const message = JSON.parse(event.data) as { type: string; payload: DeviceSnapshot }; if (message.type === "device-snapshot-updated") apply(message.payload); };
+      return () => socket?.close();
+    }
+    return connectExtension(message => { if (message.type === "status") setMode(message.connected ? "full" : "setupRequired"); if (message.type === "snapshot" && message.snapshot.revision >= revision.current) { revision.current = message.snapshot.revision; setSnapshot({ ...message.snapshot, devices: [...message.snapshot.devices] }); setMode("full"); } if (message.type === "error") setMode("error"); });
+  }, [localApp]);
   const source = mode === "demo" ? mocks : snapshot.devices;
   const devices = useMemo(() => source.filter(device => (settings.showBuiltIn || device.isExternal || device.category === "computer" || device.category === "display") && (settings.showUnknown || device.category !== "unknown") && (settings.showUsbGeneric || device.category !== "usbGeneric") && (settings.showPrinters || device.category !== "printer") && (settings.showVirtual || !device.isVirtual)), [settings, source]);
   if (mode === "initializing" || mode === "setupRequired" || mode === "error") return <ModeSelector full={() => setMode("setupRequired")} browser={() => setMode("web")} demo={() => setMode("demo")} />;

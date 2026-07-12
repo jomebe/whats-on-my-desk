@@ -1,11 +1,14 @@
-use super::models::{RawDevice, VisualDevice};
+use super::{
+    models::{RawDevice, VisualDevice},
+    raw_input::InputPresence,
+};
 use sha2::{Digest, Sha256};
 
 fn has(text: &str, words: &[&str]) -> bool {
     words.iter().any(|word| text.contains(word))
 }
 
-pub fn classify(raw: RawDevice) -> Option<VisualDevice> {
+pub fn classify(raw: RawDevice, raw_input: &InputPresence) -> Option<VisualDevice> {
     let text = format!("{} {} {}", raw.name, raw.class_name, raw.instance_id).to_lowercase();
     if has(
         &text,
@@ -84,15 +87,34 @@ pub fn classify(raw: RawDevice) -> Option<VisualDevice> {
     if is_virtual {
         return None;
     }
+    let internal = has(
+        &text,
+        &[
+            "acpi",
+            "i8042",
+            "ps/2",
+            "touchpad",
+            "precision touchpad",
+            "i2c hid",
+            "elan",
+            "synaptics",
+            "internal pointing",
+        ],
+    );
+    let raw_input_present = (category == "keyboard" || category == "mouse")
+        && raw_input.contains(category, &raw.instance_id);
+    if (category == "keyboard" || category == "mouse") && (!raw_input_present || internal) {
+        eprintln!("[input] category={category} raw_input_present={raw_input_present} internal={internal} selected=false name={}", raw.name);
+        return None;
+    }
     let is_external = connection == "USB"
         || connection == "Bluetooth"
-        || ((category == "keyboard" || category == "mouse")
-            && !has(
-                &text,
-                &["acpi", "i8042", "ps/2", "touchpad", "precision touchpad"],
-            ));
+        || ((category == "keyboard" || category == "mouse") && raw_input_present && !internal);
     let mut hash = Sha256::new();
     hash.update(raw.stable_key.as_bytes());
+    if category == "keyboard" || category == "mouse" {
+        eprintln!("[input] category={category} raw_input_present={raw_input_present} internal={internal} selected=true name={}", raw.name);
+    }
     Some(VisualDevice {
         id: format!("{:x}", hash.finalize())[..16].into(),
         category: category.into(),

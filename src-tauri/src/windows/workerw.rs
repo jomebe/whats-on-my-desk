@@ -2,10 +2,11 @@ use std::ptr::{null, null_mut};
 use windows_sys::Win32::{
     Foundation::{GetLastError, SetLastError, HWND, LPARAM, RECT},
     UI::WindowsAndMessaging::{
-        EnumWindows, FindWindowExW, FindWindowW, GetClientRect, GetParent, GetWindowLongPtrW,
-        SendMessageTimeoutW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE,
-        SMTO_NORMAL, SWP_FRAMECHANGED, SWP_NOZORDER, SWP_SHOWWINDOW, WS_CHILD, WS_EX_APPWINDOW,
-        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+        EnumWindows, FindWindowExW, FindWindowW, GetClientRect, GetParent, GetWindow,
+        GetWindowLongPtrW, IsWindowVisible, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
+        SetWindowPos, GWL_EXSTYLE, GWL_STYLE, GW_HWNDPREV, SMTO_NORMAL, SWP_FRAMECHANGED,
+        SWP_NOZORDER, SWP_SHOWWINDOW, WS_CHILD, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
+        WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
     },
 };
 
@@ -23,6 +24,10 @@ impl Strategy {
     }
 }
 pub struct Result {
+    pub progman: HWND,
+    pub defview_parent: HWND,
+    pub defview: HWND,
+    pub listview: HWND,
     pub wallpaper_parent: HWND,
     pub strategy: Strategy,
 }
@@ -62,7 +67,18 @@ pub fn find_wallpaper_parent() -> std::result::Result<Result, String> {
         debug(|| eprintln!("[workerw] defview_parent={:p}", context.defview_parent));
         debug(|| eprintln!("[workerw] wallpaper_parent={parent:p}"));
         debug(|| eprintln!("[workerw] strategy={}", strategy.label()));
+        let defview = FindWindowExW(
+            context.defview_parent,
+            null_mut(),
+            wide("SHELLDLL_DefView").as_ptr(),
+            null(),
+        );
+        let listview = FindWindowExW(defview, null_mut(), wide("SysListView32").as_ptr(), null());
         Ok(Result {
+            progman,
+            defview_parent: context.defview_parent,
+            defview,
+            listview,
             wallpaper_parent: parent,
             strategy,
         })
@@ -140,6 +156,31 @@ pub fn attach(host: HWND, parent: HWND) -> std::result::Result<(), String> {
         });
         debug(|| eprintln!("[workerw] host_after_parent={:p}", GetParent(host)));
         Ok(())
+    }
+}
+
+pub fn log_shell(host: HWND, found: &Result) {
+    unsafe {
+        let mut above = GetWindow(host, GW_HWNDPREV);
+        let mut host_behind_icons = false;
+        for _ in 0..64 {
+            if above.is_null() {
+                break;
+            }
+            if above == found.defview || above == found.defview_parent {
+                host_behind_icons = true;
+                break;
+            }
+            above = GetWindow(above, GW_HWNDPREV);
+        }
+        debug(|| eprintln!("[shell] progman={:p}", found.progman));
+        debug(|| eprintln!("[shell] defview={:p}", found.defview));
+        debug(|| eprintln!("[shell] defview_parent={:p}", found.defview_parent));
+        debug(|| eprintln!("[shell] listview={:p}", found.listview));
+        debug(|| eprintln!("[shell] wallpaper_host={host:p}"));
+        debug(|| eprintln!("[shell] wallpaper_parent={:p}", found.wallpaper_parent));
+        debug(|| eprintln!("[shell] host_visible={}", IsWindowVisible(host) != 0));
+        debug(|| eprintln!("[shell] host_behind_icons={host_behind_icons}"));
     }
 }
 

@@ -4,14 +4,19 @@ mod enumerate;
 mod midi;
 mod models;
 mod monitors;
+mod raw_input;
 pub mod watcher;
 pub use models::DeviceSnapshot;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn snapshot() -> DeviceSnapshot {
     let raw = enumerate::enumerate();
+    let raw_input = raw_input::enumerate();
     let raw_device_count = raw.len() as u32;
-    let mut devices: Vec<_> = raw.into_iter().filter_map(classify::classify).collect();
+    let mut devices: Vec<_> = raw
+        .into_iter()
+        .filter_map(|device| classify::classify(device, &raw_input))
+        .collect();
     let filtered_device_count = devices.len() as u32;
     devices = deduplicate::merge(devices);
     devices.extend(monitors::enumerate());

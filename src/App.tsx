@@ -14,8 +14,9 @@ type AppMode = "initializing" | "full" | "web" | "setupRequired" | "demo" | "err
 type InteractionMode = "wallpaper" | "interactive";
 const empty: DeviceSnapshot = { revision: 0, source: "agent", generatedAt: 0, devices: [] };
 export default function App() {
-  const { settings, update } = useSettings(); const [mode, setMode] = useState<AppMode>("initializing"); const [interactionMode, setInteractionMode] = useState<InteractionMode>("wallpaper"); const [snapshot, setSnapshot] = useState(empty); const [mocks, setMocks] = useState(initialMocks); const [settingsOpen, setSettingsOpen] = useState(false); const revision = useRef(0);
+  const { settings, update } = useSettings(); const [mode, setMode] = useState<AppMode>("initializing"); const [interactionMode, setInteractionMode] = useState<InteractionMode>("wallpaper"); const [snapshot, setSnapshot] = useState(empty); const [mocks, setMocks] = useState(initialMocks); const [settingsOpen, setSettingsOpen] = useState(false); const [hostStrategy, setHostStrategy] = useState("unknown"); const [lastPointer, setLastPointer] = useState("none"); const [lastKey, setLastKey] = useState("none"); const revision = useRef(0);
   const localApp = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+  const debugInteraction = new URLSearchParams(location.search).get("debugInteraction") === "1";
   useEffect(() => {
     if (localApp) {
       let socket: WebSocket | undefined;
@@ -38,9 +39,16 @@ export default function App() {
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("womd-interaction-mode", onMode); window.removeEventListener("keydown", onKeyDown); };
   }, [interactionMode]);
+  useEffect(() => {
+    const onPointer = (event: PointerEvent) => setLastPointer(event.type);
+    const onKey = (event: KeyboardEvent) => setLastKey(event.key);
+    const onHost = (event: Event) => setHostStrategy((event as CustomEvent<{ strategy: string }>).detail.strategy);
+    window.addEventListener("pointermove", onPointer); window.addEventListener("keydown", onKey); window.addEventListener("womd-host-debug", onHost);
+    return () => { window.removeEventListener("pointermove", onPointer); window.removeEventListener("keydown", onKey); window.removeEventListener("womd-host-debug", onHost); };
+  }, []);
   const source = mode === "demo" ? mocks : snapshot.devices;
   const devices = useMemo(() => source.filter(device => (settings.showBuiltIn || device.isExternal || device.category === "computer" || device.category === "display") && (settings.showUnknown || device.category !== "unknown") && (settings.showUsbGeneric || device.category !== "usbGeneric") && (settings.showPrinters || device.category !== "printer") && (settings.showVirtual || !device.isVirtual)), [settings, source]);
   if (mode === "initializing" || mode === "setupRequired" || mode === "error") return <ModeSelector full={() => setMode("setupRequired")} browser={() => setMode("web")} demo={() => setMode("demo")} />;
   if (mode === "web" && !snapshot.devices.length) return <main className="mode-selector"><div><h1>Browser Mode</h1><p>Only browser-permitted real devices appear.</p><button onClick={() => void browserMidi().then(next => { revision.current = next.revision; setSnapshot(next); })}>Connect MIDI</button><button className="quiet" onClick={() => setMode("setupRequired")}>Back</button></div></main>;
-  return <div className={`app theme-${settings.theme} mode-${interactionMode} ${settings.animations ? "with-motion" : "no-motion"}`}><header className="topbar"><span>What’s on My Desk?</span>{interactionMode === "interactive" && <small className="interaction-hint">Interactive mode · Press Esc to return</small>}<button className="gear" onClick={() => setSettingsOpen(value => !value)} aria-label="Settings">⌁</button></header><DeviceScene devices={devices} showNames={settings.showNames} interactionMode={interactionMode} />{settingsOpen && <SettingsPanel settings={settings} update={update} close={() => setSettingsOpen(false)} refresh={() => window.location.reload()} />}{mode === "demo" && <MockControlPanel devices={mocks} setDevices={setMocks} />}</div>;
+  return <div className={`app theme-${settings.theme} mode-${interactionMode} ${settings.animations ? "with-motion" : "no-motion"}`}><header className="topbar"><span>What’s on My Desk?</span>{interactionMode === "interactive" && <small className="interaction-hint">Interactive mode · Press Esc to return</small>}<button className="gear" onClick={() => setSettingsOpen(value => !value)} aria-label="Settings">⌁</button></header><DeviceScene devices={devices} showNames={settings.showNames} interactionMode={interactionMode} />{debugInteraction && <aside className="interaction-debug"><b>{hostStrategy}</b><b>{interactionMode.toUpperCase()}</b><span>Document focus: {String(document.hasFocus())}</span><span>Last pointer: {lastPointer}</span><span>Last key: {lastKey}</span><span>HTTRANSPARENT: {String(interactionMode === "wallpaper")}</span><span>WS_EX_TRANSPARENT: {String(interactionMode === "wallpaper")}</span></aside>}{settingsOpen && <SettingsPanel settings={settings} update={update} close={() => setSettingsOpen(false)} refresh={() => window.location.reload()} />}{mode === "demo" && <MockControlPanel devices={mocks} setDevices={setMocks} />}</div>;
 }

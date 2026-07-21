@@ -4,12 +4,16 @@ pub fn run() {
         atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering},
         OnceLock,
     };
-    std::thread::spawn(|| {
+    let (server_ready_tx, server_ready_rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
         tokio::runtime::Runtime::new()
             .expect("runtime")
-            .block_on(crate::server::serve(false));
+            .block_on(crate::server::serve(false, Some(server_ready_tx)));
     });
-    std::thread::sleep(std::time::Duration::from_millis(700));
+    if let Err(error) = server_ready_rx.recv_timeout(std::time::Duration::from_secs(30)) {
+        eprintln!("[agent] loopback startup failed: {error}");
+        return;
+    }
     use tao::{
         event::Event,
         event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
@@ -114,10 +118,13 @@ pub fn run() {
         }));
         let proxy = EVENT_PROXY.get().expect("event proxy").clone();
         TrayIconEvent::set_event_handler(Some(move |event| {
-            if matches!(
-                event,
-                TrayIconEvent::Click { .. } | TrayIconEvent::DoubleClick { .. }
-            ) {
+            let is_left_click = match event {
+                TrayIconEvent::Click { button, .. } | TrayIconEvent::DoubleClick { button, .. } => {
+                    button == tray_icon::MouseButton::Left
+                }
+                _ => false,
+            };
+            if is_left_click {
                 let _ = proxy.send_event(HostEvent::TrayEnter);
             }
         }));
@@ -170,29 +177,27 @@ pub fn run() {
         })
         .build(&windows[0])
         .expect("WebView2");
-    let mut wallpaper_parent = match crate::windows::workerw::find_wallpaper_parent() {
-        Ok(found) => {
-            let _strategy = found.strategy;
-            match crate::windows::workerw::attach(host, found.wallpaper_parent) {
-                Ok(()) => {
-                    crate::windows::workerw::log_shell(host, &found);
-                    let _ = webview.evaluate_script(&format!("window.dispatchEvent(new CustomEvent('womd-host-debug', {{ detail: {{ strategy: '{}' }} }}));", found.strategy.label()));
-                    eprintln!("[workerw] attach_success=true");
-                    found.wallpaper_parent
-                }
-                Err(error) => {
-                    eprintln!("[workerw] attach failed, fallback=desktop-overlay error={error}");
-                    eprintln!("[workerw] attach_success=false");
-                    std::ptr::null_mut()
-                }
+    let mut wallpaper_target = match crate::windows::workerw::find_wallpaper_parent() {
+        Ok(found) => match crate::windows::workerw::attach(host, &found) {
+            Ok(()) => {
+                crate::windows::workerw::log_shell(host, &found);
+                let _ = webview.evaluate_script(&format!("window.dispatchEvent(new CustomEvent('womd-host-debug', {{ detail: {{ strategy: '{}' }} }}));", found.strategy.label()));
+                eprintln!("[workerw] attach_success=true");
+                Some(found)
             }
-        }
+            Err(error) => {
+                eprintln!("[workerw] attach failed, fallback=desktop-overlay error={error}");
+                eprintln!("[workerw] attach_success=false");
+                None
+            }
+        },
         Err(error) => {
             eprintln!("[workerw] attach failed, fallback=desktop-overlay error={error}");
             eprintln!("[workerw] attach_success=false");
-            std::ptr::null_mut()
+            None
         }
     };
+    fit_webview(&webview, windows[0].inner_size());
     crate::windows::interaction::set_mode(
         host,
         crate::windows::interaction::InteractionMode::Wallpaper,
@@ -250,15 +255,36 @@ pub fn run() {
                 let _ = webview.focus_parent();
                 let _ = webview.evaluate_script("window.dispatchEvent(new CustomEvent('womd-interaction-mode', { detail: { mode: 'wallpaper' } }));");
             }
+            Event::WindowEvent { window_id, event: tao::event::WindowEvent::Resized(size), .. }
+                if windows.last().is_some_and(|window| window.id() == window_id) =>
+            {
+                fit_webview(&webview, size);
+            }
             Event::UserEvent(HostEvent::HealthCheck) => unsafe {
-                use windows_sys::Win32::UI::WindowsAndMessaging::IsWindow;
-                if wallpaper_parent.is_null() || IsWindow(wallpaper_parent) == 0 {
-                    eprintln!("[shell] parent invalid");
-                    eprintln!("[shell] explorer restart detected");
+                let attachment_error = wallpaper_target
+                    .as_ref()
+                    .map_or_else(
+                        || Some("wallpaper target missing".to_string()),
+                        |found| crate::windows::workerw::validate_attachment(host, found).err(),
+                    );
+                if let Some(reason) = attachment_error {
+                    eprintln!("[shell] attachment unhealthy error={reason}");
                     if let Ok(found) = crate::windows::workerw::find_wallpaper_parent() {
                         let strategy = found.strategy.label();
-                        match crate::windows::workerw::attach(host, found.wallpaper_parent) {
-                            Ok(()) => { wallpaper_parent = found.wallpaper_parent; crate::windows::workerw::log_shell(host, &found); eprintln!("[shell] reattach strategy={strategy}"); eprintln!("[shell] reattach success=true"); eprintln!("[shell] interaction mode restored={}", if INTERACTIVE.load(Ordering::Relaxed) { "interactive" } else { "wallpaper" }); }
+                        match crate::windows::workerw::attach(host, &found) {
+                            Ok(()) => {
+                                wallpaper_target = Some(found);
+                                fit_webview(
+                                    &webview,
+                                    windows.last().expect("desktop window").inner_size(),
+                                );
+                                let mode = if INTERACTIVE.load(Ordering::Relaxed) { crate::windows::interaction::InteractionMode::Interactive } else { crate::windows::interaction::InteractionMode::Wallpaper };
+                                crate::windows::interaction::set_mode(host, mode);
+                                crate::windows::workerw::log_shell(host, &found);
+                                eprintln!("[shell] reattach strategy={strategy}");
+                                eprintln!("[shell] reattach success=true");
+                                eprintln!("[shell] interaction mode restored={}", mode.label());
+                            }
                             Err(error) => {
                                 eprintln!("[shell] reattach failed error={error}; recreating host");
                                 let _ = windows_sys::Win32::UI::Input::KeyboardAndMouse::UnregisterHotKey(host, HOTKEY_INTERACTION_TOGGLE);
@@ -270,15 +296,35 @@ pub fn run() {
                                 windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(next_host, windows_sys::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC, host_wndproc as *const () as usize as isize);
                                 ORIGINAL_WNDPROC.store(old, Ordering::Relaxed);
                                 let registered = windows_sys::Win32::UI::Input::KeyboardAndMouse::RegisterHotKey(next_host, HOTKEY_INTERACTION_TOGGLE, windows_sys::Win32::UI::Input::KeyboardAndMouse::MOD_CONTROL | windows_sys::Win32::UI::Input::KeyboardAndMouse::MOD_ALT, b'D' as u32) != 0;
+                                let previous_webview = std::mem::replace(&mut webview, next_webview);
+                                let previous_window = windows.pop().expect("previous desktop window");
+                                windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                                    host,
+                                    windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                                );
+                                drop(previous_webview);
+                                drop(previous_window);
                                 host = next_host;
                                 windows.push(next_window);
-                                webview = next_webview;
-                                match crate::windows::workerw::attach(host, found.wallpaper_parent) {
-                                    Ok(()) => { wallpaper_parent = found.wallpaper_parent; crate::windows::interaction::set_mode(host, if INTERACTIVE.load(Ordering::Relaxed) { crate::windows::interaction::InteractionMode::Interactive } else { crate::windows::interaction::InteractionMode::Wallpaper }); crate::windows::workerw::log_shell(host, &found); eprintln!("[hotkey] recovery register success={registered}"); eprintln!("[shell] reattach strategy={strategy}"); eprintln!("[shell] reattach success=true"); }
-                                    Err(error) => eprintln!("[shell] reattach success=false error={error}"),
+                                match crate::windows::workerw::attach(host, &found) {
+                                    Ok(()) => {
+                                        wallpaper_target = Some(found);
+                                        fit_webview(&webview, windows.last().expect("recovery window").inner_size());
+                                        crate::windows::interaction::set_mode(host, if INTERACTIVE.load(Ordering::Relaxed) { crate::windows::interaction::InteractionMode::Interactive } else { crate::windows::interaction::InteractionMode::Wallpaper });
+                                        crate::windows::workerw::log_shell(host, &found);
+                                        eprintln!("[hotkey] recovery register success={registered}");
+                                        eprintln!("[shell] reattach strategy={strategy}");
+                                        eprintln!("[shell] reattach success=true");
+                                    }
+                                    Err(error) => {
+                                        wallpaper_target = None;
+                                        eprintln!("[shell] reattach success=false error={error}");
+                                    }
                                 }
                             }
                         }
+                    } else {
+                        wallpaper_target = None;
                     }
                 }
             },
@@ -291,9 +337,22 @@ pub fn run() {
     });
 }
 
+#[cfg(windows)]
+fn fit_webview(webview: &wry::WebView, size: tao::dpi::PhysicalSize<u32>) {
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    if let Err(error) = webview.set_bounds(wry::Rect {
+        position: wry::dpi::LogicalPosition::new(0, 0).into(),
+        size: wry::dpi::PhysicalSize::new(size.width, size.height).into(),
+    }) {
+        eprintln!("[webview] resize failed error={error}");
+    }
+}
+
 #[cfg(not(windows))]
 pub fn run() {
     tokio::runtime::Runtime::new()
         .expect("runtime")
-        .block_on(crate::server::serve(true));
+        .block_on(crate::server::serve(true, None));
 }

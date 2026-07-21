@@ -18,6 +18,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/WhatsOnMyDeskSetup-0.1.0-alpha.2-x64.exe
-            release/WhatsOnMyDesk-0.1.0-alpha.2-portable-x64.zip
+            release/WhatsOnMyDeskSetup-0.1.0-alpha.5-x64.exe
+            release/WhatsOnMyDesk-0.1.0-alpha.5-portable-x64.zip
             release/SHA256SUMS.txt

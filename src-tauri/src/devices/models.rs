@@ -54,7 +54,11 @@ pub struct MidiInfo {
 pub struct RawDevice {
     pub stable_key: String,
     pub name: String,
+    pub physical_name: String,
     pub manufacturer: String,
     pub class_name: String,
     pub instance_id: String,
+    pub metadata_text: String,
+    pub connection_type: String,
+    pub is_external: bool,
 }

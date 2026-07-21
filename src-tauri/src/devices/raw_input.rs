@@ -16,6 +16,14 @@ impl InputPresence {
             .iter()
             .any(|name| normalize(name).contains(&target) || target.contains(&normalize(name)))
     }
+
+    #[cfg(test)]
+    pub fn with_keyboard(instance_id: &str) -> Self {
+        Self {
+            keyboards: vec![instance_id.into()],
+            mice: Vec::new(),
+        }
+    }
 }
 
 #[cfg(windows)]

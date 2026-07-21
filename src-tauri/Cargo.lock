@@ -2983,7 +2983,7 @@ dependencies = [
 
 [[package]]
 name = "whats_on_my_desk_agent"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.5"
 dependencies = [
  "axum",
  "include_dir",

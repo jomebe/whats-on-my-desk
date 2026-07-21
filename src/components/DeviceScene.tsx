@@ -14,8 +14,29 @@ export function DeviceScene({ devices, showNames, interactionMode }: { devices: 
   const displays = rendered.filter(device => device.category === "display").slice(0, 4);
   const byCategory = (category: DeviceCategory) => rendered.filter(device => device.category === category);
   const camera = byCategory("camera")[0];
-  const item = (device: VisualDevice, slot: string, index = 0, attachment = false) => <button key={device.id} className={`scene-device ${device.present ? "" : "leaving"} slot-${slot} slot-${slot}-${index}`} onClick={event => { event.stopPropagation(); setSelected(device); }} aria-label={device.displayName ?? device.category}><DeviceIllustration category={device.category} />{attachment && camera && <span className="camera-attachment"><DeviceIllustration category="camera" /></span>}{device.count > 1 && <span className="count">{device.count}</span>}{showNames && <span className="device-name">{device.displayName}</span>}</button>;
-  return <main className={`scene mode-${interactionMode}`} onClick={() => setSelected(null)}>
+  const primary = [
+    ...displays,
+    ...byCategory("computer").slice(0, 1),
+    ...byCategory("keyboard").slice(0, 1),
+    ...byCategory("mouse").slice(0, 1),
+    ...byCategory("headset").slice(0, 1),
+    ...byCategory("speaker").slice(0, 2),
+    ...byCategory("microphone").slice(0, 1),
+    ...byCategory("storage").slice(0, 3),
+    ...byCategory("phone").slice(0, 1),
+    ...byCategory("gameController").slice(0, 2),
+    ...byCategory("midiKeyboard").slice(0, 1),
+    ...byCategory("midiController").slice(0, 2),
+    ...byCategory("midiInterface").slice(0, 1),
+    ...byCategory("printer").slice(0, 1),
+    ...byCategory("usbGeneric").slice(0, 1),
+    ...byCategory("unknown").slice(0, 1),
+    ...(camera && displays.length ? [camera] : []),
+  ];
+  const primaryIds = new Set(primary.map(device => device.id));
+  const accessories = rendered.filter(device => !primaryIds.has(device.id));
+  const item = (device: VisualDevice, slot: string, index = 0, attachment = false, compact = false) => <button key={device.id} className={`scene-device ${device.present ? "" : "leaving"} slot-${slot} slot-${slot}-${index}`} onClick={event => { event.stopPropagation(); setSelected(device); }} aria-label={device.displayName ?? device.category}><DeviceIllustration category={device.category} />{attachment && camera && <span className="camera-attachment"><DeviceIllustration category="camera" /></span>}{device.count > 1 && <span className="count">{device.count}</span>}{(showNames || compact) && <span className="device-name">{device.displayName ?? device.category}</span>}</button>;
+  return <main className={`scene mode-${interactionMode} ${accessories.length ? "has-accessories" : ""}`} onClick={() => setSelected(null)}>
     <div className="wall-layer"><div className="poster">MAKE<br/>SOMETHING</div><div className="ambient-light" /></div>
     <div className="desk-surface"><div className="desk-grain" /><div className="desk-front" /></div>
     <div className="cable cable-monitor" /><div className="cable cable-keyboard" /><div className="cable cable-midi" />
@@ -36,6 +57,7 @@ export function DeviceScene({ devices, showNames, interactionMode }: { devices: 
     {byCategory("printer").slice(0, 1).map(device => item(device, "printer"))}
     {byCategory("usbGeneric").slice(0, 1).map(device => item(device, "usb"))}
     {byCategory("unknown").slice(0, 1).map(device => item(device, "unknown"))}
+    {accessories.length > 0 && <aside className="accessory-shelf" aria-label="More connected devices">{accessories.map((device, index) => item(device, "accessory", index, false, true))}</aside>}
     {selected && <aside className="popover"><strong>{selected.displayName ?? "Connected device"}</strong><span>{selected.category}</span>{selected.manufacturer && <span>{selected.manufacturer}</span>}<span>{selected.connectionType}</span><span>{selected.isExternal ? "External" : "Built-in"}</span></aside>}
   </main>;
 }

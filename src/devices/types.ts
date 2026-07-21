@@ -20,6 +20,7 @@ export interface VisualDevice {
 export interface DeviceSnapshot { revision: number; source: "agent" | "browser" | "demo"; generatedAt: number; rawDeviceCount?: number; filteredDeviceCount?: number; mergedPhysicalDeviceCount?: number; devices: VisualDevice[] }
 
 export interface Settings {
+  schemaVersion: number;
   animations: boolean;
   showNames: boolean;
   showBuiltIn: boolean;

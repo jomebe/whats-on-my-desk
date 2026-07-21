@@ -15,7 +15,7 @@ Latest installer와 portable ZIP: [GitHub Releases](https://github.com/jomebe/wh
 
 ## Installation
 
-`WhatsOnMyDeskSetup-0.1.0-alpha.2-x64.exe`를 실행한다. WebView2 Evergreen Runtime이 필요하다. 설치 프로그램은 현재 사용자 범위에 설치하며 관리자 권한을 요구하지 않는다.
+`WhatsOnMyDeskSetup-0.1.0-alpha.5-x64.exe`를 실행한다. WebView2 Evergreen Runtime이 필요하다. 설치 프로그램은 현재 사용자 범위에 설치하며 관리자 권한을 요구하지 않는다.
 
 ## Interaction Mode
 
@@ -44,7 +44,7 @@ cargo run --release
 .\scripts\package-release.ps1
 ```
 
-출력: `release/WhatsOnMyDeskSetup-0.1.0-alpha.2-x64.exe`, `release/WhatsOnMyDesk-0.1.0-alpha.2-portable-x64.zip`, `release/SHA256SUMS.txt`.
+출력: `release/WhatsOnMyDeskSetup-0.1.0-alpha.5-x64.exe`, `release/WhatsOnMyDesk-0.1.0-alpha.5-portable-x64.zip`, `release/SHA256SUMS.txt`.
 
 ## Known Limitations
 

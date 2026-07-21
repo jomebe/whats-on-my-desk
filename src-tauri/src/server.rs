@@ -67,6 +67,7 @@ struct Diagnostics {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    pub schema_version: u32,
     pub animations: bool,
     pub show_names: bool,
     pub show_built_in: bool,
@@ -79,19 +80,20 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            schema_version: 2,
             animations: true,
             show_names: false,
             show_built_in: false,
             show_unknown: false,
-            show_usb_generic: false,
+            show_usb_generic: true,
             show_virtual: false,
-            show_printers: false,
+            show_printers: true,
             theme: "system".into(),
         }
     }
 }
 
-pub async fn serve(open_browser: bool) {
+pub async fn serve(open_browser: bool, ready: Option<std::sync::mpsc::Sender<()>>) {
     eprintln!("[agent] starting snapshot");
     let first = devices::snapshot();
     eprintln!("[agent] snapshot ready");
@@ -130,6 +132,9 @@ pub async fn serve(open_browser: bool) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:47831")
         .await
         .expect("bind local agent");
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
     let _keep_native_registration = native.ok();
     if open_browser {
         let _ = webbrowser::open(ORIGIN);
@@ -153,7 +158,7 @@ fn spawn_watchers(state: AppState, mut native_rx: mpsc::UnboundedReceiver<()>) {
         }
     });
     tokio::spawn(async move {
-        let mut tick = interval(Duration::from_secs(2));
+        let mut tick = interval(Duration::from_secs(10));
         loop {
             tick.tick().await;
             {
@@ -192,11 +197,13 @@ async fn rebuild_and_broadcast(state: &AppState, _: &str) -> DeviceSnapshot {
     if changed {
         diag.last_broadcast_at = Some(now());
     }
-    eprintln!(
-        "[devices] raw={} visual={} changed={changed}",
-        next.raw_device_count,
-        next.devices.len()
-    );
+    if changed || cfg!(debug_assertions) {
+        eprintln!(
+            "[devices] raw={} visual={} changed={changed}",
+            next.raw_device_count,
+            next.devices.len()
+        );
+    }
     next
 }
 
@@ -214,7 +221,10 @@ fn now() -> u64 {
 }
 
 async fn health() -> Json<HashMap<&'static str, &'static str>> {
-    Json(HashMap::from([("status", "ok"), ("version", "0.2.0")]))
+    Json(HashMap::from([
+        ("status", "ok"),
+        ("version", env!("CARGO_PKG_VERSION")),
+    ]))
 }
 async fn get_snapshot(State(state): State<AppState>) -> Json<DeviceSnapshot> {
     Json(state.snapshot.lock().await.clone())
@@ -318,8 +328,13 @@ fn settings_path() -> std::path::PathBuf {
 fn load_settings() -> Settings {
     std::fs::read_to_string(settings_path())
         .ok()
-        .and_then(|data| serde_json::from_str(&data).ok())
+        .and_then(|data| parse_settings(&data))
         .unwrap_or_default()
+}
+fn parse_settings(data: &str) -> Option<Settings> {
+    serde_json::from_str(data)
+        .ok()
+        .filter(|settings: &Settings| settings.schema_version == 2)
 }
 fn save_settings(settings: &Settings) {
     let path = settings_path();
@@ -330,4 +345,18 @@ fn save_settings(settings: &Settings) {
         path,
         serde_json::to_vec_pretty(settings).unwrap_or_default(),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_are_migrated_to_visible_device_defaults() {
+        let legacy = r#"{"animations":true,"showNames":false,"showBuiltIn":false,"showUnknown":false,"showUsbGeneric":false,"showVirtual":false,"showPrinters":false,"theme":"dark"}"#;
+        assert!(parse_settings(legacy).is_none());
+        let migrated = Settings::default();
+        assert!(migrated.show_usb_generic);
+        assert!(migrated.show_printers);
+    }
 }

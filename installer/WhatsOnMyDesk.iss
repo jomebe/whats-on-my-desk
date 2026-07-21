@@ -2,7 +2,7 @@
 #define MyAppSafeName "WhatsOnMyDesk"
 #define MyAppMenuName "Whats on My Desk"
 #define MyAppExeName "WhatsOnMyDesk.exe"
-#define MyAppVersion "0.1.0-alpha.2"
+#define MyAppVersion "0.1.0-alpha.5"
 #define MyAppPublisher "jomebe"
 #define MyAppURL "https://whats-on-my-desk.pages.dev"
 
@@ -25,6 +25,8 @@ OutputBaseFilename=WhatsOnMyDeskSetup-{#MyAppVersion}-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+CloseApplications=force
+RestartApplications=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#MyAppDisplayName}

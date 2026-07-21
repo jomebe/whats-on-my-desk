@@ -1,11 +1,11 @@
 {
   "name": "whats-on-my-desk-web",
   "private": true,
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --configLoader runner",
     "agent:dev": "cargo run --manifest-path src-tauri/Cargo.toml",
     "build:extension": "powershell -ExecutionPolicy Bypass -File scripts/build-extension.ps1",
     "build:agent": "powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1",

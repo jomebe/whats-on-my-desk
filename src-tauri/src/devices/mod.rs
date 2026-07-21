@@ -18,13 +18,13 @@ pub fn snapshot() -> DeviceSnapshot {
         .filter_map(|device| classify::classify(device, &raw_input))
         .collect();
     let filtered_device_count = devices.len() as u32;
+    devices = merge_physical_devices(devices);
     devices = deduplicate::merge(devices);
     devices.extend(monitors::enumerate());
     let midi_devices = midi::enumerate();
     let midi_count = midi_devices.len();
     devices.extend(midi_devices);
     devices.push(computer());
-    limit_categories(&mut devices);
     devices.sort_by(|a, b| a.category.cmp(&b.category).then(a.id.cmp(&b.id)));
     let merged_physical_device_count = devices.len() as u32;
     eprintln!(
@@ -62,39 +62,77 @@ fn computer() -> models::VisualDevice {
     }
 }
 
-fn limit_categories(devices: &mut Vec<models::VisualDevice>) {
+fn merge_physical_devices(devices: Vec<models::VisualDevice>) -> Vec<models::VisualDevice> {
     use std::collections::BTreeMap;
-    let limits = [
-        ("display", 4),
-        ("computer", 1),
-        ("keyboard", 1),
-        ("mouse", 1),
-        ("headset", 1),
-        ("speaker", 2),
-        ("microphone", 1),
-        ("camera", 1),
-        ("phone", 1),
-        ("storage", 3),
-        ("gameController", 2),
-        ("midiKeyboard", 1),
-        ("midiController", 2),
-        ("midiInterface", 1),
-        ("printer", 1),
-        ("usbGeneric", 1),
-        ("unknown", 1),
-    ];
-    let map: BTreeMap<_, _> = limits.into_iter().collect();
-    let mut counts: BTreeMap<String, i32> = BTreeMap::new();
-    devices.retain(|device| {
-        let count = counts.entry(device.category.clone()).or_default();
-        *count += 1;
-        *count <= *map.get(device.category.as_str()).unwrap_or(&0)
-    });
+    let mut groups: BTreeMap<String, Vec<models::VisualDevice>> = BTreeMap::new();
+    for device in devices {
+        groups.entry(device.id.clone()).or_default().push(device);
+    }
+    groups
+        .into_values()
+        .map(|group| {
+            let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
+            for device in &group {
+                *category_counts.entry(device.category.clone()).or_default() += 1;
+            }
+            let best_category = category_counts
+                .into_iter()
+                .max_by_key(|(category, count)| {
+                    (
+                        category_quality(category),
+                        *count,
+                        category_tie_break(category),
+                    )
+                })
+                .map(|(category, _)| category)
+                .unwrap_or_default();
+            let mut chosen = group
+                .iter()
+                .find(|device| device.category == best_category)
+                .cloned()
+                .unwrap_or_else(|| group[0].clone());
+            chosen.count = 1;
+            chosen.is_external = group.iter().any(|device| device.is_external);
+            if let Some(connection) = group
+                .iter()
+                .map(|device| device.connection_type.as_str())
+                .find(|connection| !matches!(*connection, "Unknown" | "BuiltIn"))
+            {
+                chosen.connection_type = connection.into();
+            }
+            if chosen.manufacturer.is_none() {
+                chosen.manufacturer = group.iter().find_map(|device| device.manufacturer.clone());
+            }
+            chosen
+        })
+        .collect()
+}
+
+fn category_quality(category: &str) -> u8 {
+    match category {
+        "midiKeyboard" | "midiController" | "midiInterface" => 12,
+        "storage" | "camera" | "gameController" => 11,
+        "headset" | "phone" | "printer" => 10,
+        "keyboard" | "mouse" => 9,
+        "speaker" | "microphone" => 8,
+        "usbGeneric" => 2,
+        "unknown" => 1,
+        _ => 5,
+    }
+}
+
+fn category_tie_break(category: &str) -> u8 {
+    match category {
+        "mouse" => 2,
+        "keyboard" => 1,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn snapshot_has_unique_ids() {
         let data = snapshot();
@@ -102,5 +140,41 @@ mod tests {
         ids.sort();
         ids.dedup();
         assert_eq!(ids.len(), data.devices.len());
+    }
+
+    #[test]
+    fn physical_container_prefers_specific_device_over_generic_usb() {
+        let generic = test_device("same", "usbGeneric");
+        let headset = test_device("same", "headset");
+        let merged = merge_physical_devices(vec![generic, headset]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].category, "headset");
+    }
+
+    #[test]
+    fn physical_container_prefers_external_connection() {
+        let mut built_in = test_device("same", "storage");
+        built_in.connection_type = "BuiltIn".into();
+        let usb = test_device("same", "storage");
+        let merged = merge_physical_devices(vec![built_in, usb]);
+        assert_eq!(merged[0].connection_type, "USB");
+    }
+
+    fn test_device(id: &str, category: &str) -> models::VisualDevice {
+        models::VisualDevice {
+            id: id.into(),
+            category: category.into(),
+            display_name: Some("Physical device".into()),
+            manufacturer: None,
+            connection_type: "USB".into(),
+            icon_key: category.into(),
+            count: 1,
+            is_external: true,
+            is_virtual: false,
+            present: true,
+            position_hint: None,
+            visual_variant: None,
+            midi: None,
+        }
     }
 }

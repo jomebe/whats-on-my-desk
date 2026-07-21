@@ -26,8 +26,9 @@ export default function App() {
       socket.onmessage = event => { const message = JSON.parse(event.data) as { type: string; payload: DeviceSnapshot }; if (message.type === "device-snapshot-updated") apply(message.payload); };
       return () => socket?.close();
     }
-    if (!localApp) return;
-    return connectExtension(message => { if (message.type === "status") setMode(message.connected ? "full" : "setupRequired"); if (message.type === "snapshot" && message.snapshot.revision >= revision.current) { revision.current = message.snapshot.revision; setSnapshot({ ...message.snapshot, devices: [...message.snapshot.devices] }); setMode("full"); } if (message.type === "error") setMode("error"); });
+    if (!localApp) {
+      return connectExtension(message => { if (message.type === "status") setMode(message.connected ? "full" : "setupRequired"); if (message.type === "snapshot" && message.snapshot.revision >= revision.current) { revision.current = message.snapshot.revision; setSnapshot({ ...message.snapshot, devices: [...message.snapshot.devices] }); setMode("full"); } if (message.type === "error") setMode("error"); });
+    }
   }, [localApp]);
   useEffect(() => {
     const onMode = (event: Event) => setInteractionMode((event as CustomEvent<{ mode: InteractionMode }>).detail.mode);
@@ -47,7 +48,7 @@ export default function App() {
     window.addEventListener("pointermove", onPointer); window.addEventListener("keydown", onKey); window.addEventListener("womd-host-debug", onHost);
     return () => { window.removeEventListener("pointermove", onPointer); window.removeEventListener("keydown", onKey); window.removeEventListener("womd-host-debug", onHost); };
   }, []);
-  if (!localApp) return <LandingPage />;
+  if (!localApp && mode !== "full" && mode !== "demo" && mode !== "web") return <LandingPage />;
   const source = mode === "demo" ? mocks : snapshot.devices;
   const devices = useMemo(() => source.filter(device => (settings.showBuiltIn || device.isExternal || device.category === "computer" || device.category === "display") && (settings.showUnknown || device.category !== "unknown") && (settings.showUsbGeneric || device.category !== "usbGeneric") && (settings.showPrinters || device.category !== "printer") && (settings.showVirtual || !device.isVirtual)), [settings, source]);
   if (mode === "initializing" || mode === "setupRequired" || mode === "error") return <ModeSelector full={() => setMode("setupRequired")} browser={() => setMode("web")} demo={() => setMode("demo")} />;
@@ -56,5 +57,5 @@ export default function App() {
 }
 
 function LandingPage() {
-  return <main className="landing"><section className="landing-hero"><p className="eyebrow">EXPERIMENTAL ALPHA · v0.1.0-alpha.2</p><h1>What’s on<br/>My Desk?</h1><p className="landing-copy">A living desktop that changes with devices connected to your PC.</p><div className="landing-actions"><a href="https://github.com/jomebe/whats-on-my-desk/releases/download/v0.1.0-alpha.2/WhatsOnMyDeskSetup-0.1.0-alpha.2-x64.exe">Download for Windows</a><a className="quiet-link" href="https://github.com/jomebe/whats-on-my-desk">View on GitHub</a></div></section><section className="landing-scene"><div className="landing-monitor"><i /></div><div className="landing-tower" /><div className="landing-keyboard" /><div className="landing-mouse" /><div className="landing-plant"><i/><i/><i/></div></section><section className="landing-features"><article><b>Your setup, alive</b><span>Devices appear and disappear in real time.</span></article><article><b>Interactive when you need it</b><span>Press Ctrl + Alt + D to explore your desk.</span></article><article><b>Private and local</b><span>Device data stays on your PC. No account, no analytics.</span></article></section></main>;
+  return <main className="landing"><section className="landing-hero"><p className="eyebrow">EXPERIMENTAL ALPHA · v0.1.0-alpha.5</p><h1>What’s on<br/>My Desk?</h1><p className="landing-copy">A living desktop that changes with devices connected to your PC.</p><div className="landing-actions"><a href="https://github.com/jomebe/whats-on-my-desk/releases/download/v0.1.0-alpha.5/WhatsOnMyDeskSetup-0.1.0-alpha.5-x64.exe">Download for Windows</a><a className="quiet-link" href="https://github.com/jomebe/whats-on-my-desk">View on GitHub</a></div></section><section className="landing-scene"><div className="landing-monitor"><i /></div><div className="landing-tower" /><div className="landing-keyboard" /><div className="landing-mouse" /><div className="landing-plant"><i/><i/><i/></div></section><section className="landing-features"><article><b>Your setup, alive</b><span>Devices appear and disappear in real time.</span></article><article><b>Interactive when you need it</b><span>Press Ctrl + Alt + D to explore your desk.</span></article><article><b>Private and local</b><span>Device data stays on your PC. No account, no analytics.</span></article></section></main>;
 }
